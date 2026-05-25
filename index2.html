@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<meta name="theme-color" content="#0d1117"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="BauWörter"/>
+<title>🏗️ Baustellenwörterbuch</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d1117;color:#e6edf3;font-family:'Segoe UI',sans-serif;overscroll-behavior:none}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-thumb{background:#30363d;border-radius:3px}
+.flip-wrap{transition:transform .55s cubic-bezier(.4,2,.55,1);transform-style:preserve-3d}
+.flip-wrap.on{transform:rotateY(180deg)}
+.face{backface-visibility:hidden;-webkit-backface-visibility:hidden;position:absolute;inset:0;border-radius:14px}
+.face.back{transform:rotateY(180deg)}
+.tile{transition:transform .18s,filter .18s;cursor:pointer}
+.tile:hover{transform:translateY(-3px);filter:brightness(1.08)}
+.opt{transition:all .15s;cursor:pointer}
+input{outline:none;background:transparent;border:none;color:#e6edf3;font-family:inherit}
+input::placeholder{color:#586069}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.fadein{animation:fadeUp .28s ease both}
+@keyframes pop{0%,100%{transform:scale(1)}50%{transform:scale(1.25)}}
+.popping{animation:pop .4s ease}
+.row:hover{background:rgba(255,255,255,.03)}
+select{background:#161b22;border:1px solid #30363d;color:#e6edf3;border-radius:6px;padding:5px 9px;font-size:13px;cursor:pointer}
+button{font-family:inherit;cursor:pointer}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef,useCallback}=React;
+const VOCAB={
+allgemein:{label:"Allgemeines",labelLv:"Vispārīgs",icon:"🏗",color:"#1a3a5c",accent:"#4a9eda",words:[
+{de:"die Baustelle",lv:"būvlaukums",pron:"BOOV-lau-kums",ex:"Die Baustelle ist gesperrt."},
+{de:"der Bauarbeiter",lv:"būvstrādnieks",pron:"BOOV-straad-nee-eks",ex:"Der Bauarbeiter trägt Helm."},
+{de:"der Vorarbeiter",lv:"priekšnieks",pron:"PREEKS-nee-eks",ex:"Der Vorarbeiter gibt Anweisungen."},
+{de:"der Bauleiter",lv:"būvuzraugs",pron:"BOOV-ooz-raugs",ex:"Der Bauleiter prüft die Pläne."},
+{de:"das Werkzeug",lv:"darbarīks",pron:"DAR-ba-reeks",ex:"Wo ist das Werkzeug?"},
+{de:"das Material",lv:"materiāls",pron:"ma-teh-ree-AALZ",ex:"Das Material ist bestellt."},
+{de:"der Schutzhelm",lv:"aizsargķivere",pron:"aiz-SARG-kee-ve-re",ex:"Trage immer den Schutzhelm!"},
+{de:"die Schutzbrille",lv:"aizsargbrilles",pron:"aiz-SARG-bril-es",ex:"Die Schutzbrille schützt die Augen."},
+{de:"die Lieferung",lv:"piegāde",pron:"pee-eh-GAA-de",ex:"Die Lieferung kommt um 8 Uhr."},
+{de:"die Rechnung",lv:"rēķins",pron:"REH-khinz",ex:"Die Rechnung wurde bezahlt."},
+{de:"fertig",lv:"gatavs",pron:"GA-tavs",ex:"Ist die Wand fertig?"},
+{de:"vorsichtig",lv:"uzmanīgi",pron:"ooz-MA-nee-gi",ex:"Arbeite vorsichtig!"},
+{de:"heute",lv:"šodien",pron:"SHO-dee-en",ex:"Heute beginnen wir den Estrich."},
+{de:"morgen",lv:"rīt",pron:"REET",ex:"Wir arbeiten morgen weiter."},
+]},
+holz_material:{label:"Holzbau – Material",labelLv:"Koka materiāli",icon:"🪵",color:"#3d2b1a",accent:"#c8853a",words:[
+{de:"das Holz",lv:"koks",pron:"KOKS",ex:"Das Holz ist trocken."},
+{de:"das Brett",lv:"dēlis",pron:"DEH-liz",ex:"Säge das Brett auf Länge."},
+{de:"der Balken",lv:"sija",pron:"SEE-ya",ex:"Der Balken trägt die Last."},
+{de:"die Latte",lv:"lata",pron:"LA-ta",ex:"Nagel die Latte fest."},
+{de:"die Diele",lv:"grīdlenta",pron:"GREED-len-ta",ex:"Die Dielen sind verlegt."},
+{de:"die Spanplatte",lv:"skaidu plātne",pron:"SKAY-du PLAAT-ne",ex:"Spanplatten für den Boden."},
+{de:"die OSB-Platte",lv:"OSB plātne",pron:"OSB PLAAT-ne",ex:"OSB für die Wände verwenden."},
+{de:"das Sperrholz",lv:"saplāksnis",pron:"sa-PLAAK-sniz",ex:"Sperrholz als Unterlage."},
+{de:"der Dachstuhl",lv:"jumta karkass",pron:"YUM-ta KAR-kass",ex:"Der Dachstuhl ist montiert."},
+{de:"das Parkett",lv:"parketa grīda",pron:"par-KE-ta GREE-da",ex:"Das Parkett glänzt schön."},
+{de:"die Schalung",lv:"veidņi",pron:"VEID-ni",ex:"Die Schalung halten."},
+{de:"das Furnier",lv:"finieris",pron:"fi-NEE-ris",ex:"Das Furnier klebt gut."},
+]},
+holz_werkzeug:{label:"Holzbau – Werkzeug",labelLv:"Koka darbarīki",icon:"🔨",color:"#2a3a1a",accent:"#7ab83a",words:[
+{de:"die Säge",lv:"zāģis",pron:"ZAA-ghiz",ex:"Die Säge braucht ein neues Blatt."},
+{de:"die Handkreissäge",lv:"rokas ripzāģis",pron:"RO-kas RIP-zaa-ghiz",ex:"Pass auf mit der Handkreissäge."},
+{de:"der Akkuschrauber",lv:"akumulatora urbis",pron:"a-koo-MOO-la-to-ra UR-bis",ex:"Gib mir den Akkuschrauber."},
+{de:"der Hammer",lv:"āmurs",pron:"AA-murz",ex:"Ich brauche den Hammer."},
+{de:"das Maßband",lv:"mērlente",pron:"MEER-len-te",ex:"Miss mit dem Maßband nach."},
+{de:"die Wasserwaage",lv:"līmeņrādis",pron:"LEE-men-yaa-dis",ex:"Die Wasserwaage zeigt gerade."},
+{de:"der Hobel",lv:"ēvele",pron:"EH-ve-le",ex:"Hobe die Kante glatt."},
+{de:"der Meißel",lv:"kalts",pron:"KALTZ",ex:"Mit dem Meißel stemmen."},
+{de:"der Winkel",lv:"leņķis",pron:"LEN-kis",ex:"Prüfe mit dem Winkel."},
+{de:"die Schleifmaschine",lv:"slīpmašīna",pron:"sleep-ma-SHEE-na",ex:"Die Fläche schleifen."},
+{de:"die Zange",lv:"knaiblītes",pron:"KNAY-blee-tes",ex:"Die Zange liegt im Kasten."},
+{de:"der Zollstock",lv:"lineāls",pron:"li-neh-AALZ",ex:"Hol den Zollstock aus dem Auto."},
+]},
+holz_verb:{label:"Holzbau – Verben",labelLv:"Koka darbības vārdi",icon:"⚙️",color:"#1a2d3a",accent:"#4abacc",words:[
+{de:"sägen",lv:"zāģēt",pron:"zaa-GHEAT",ex:"Ich muss das Brett sägen."},
+{de:"nageln",lv:"naglot",pron:"NAG-lot",ex:"Nagle die Latte an."},
+{de:"schrauben",lv:"skrūvēt",pron:"SKROO-veat",ex:"Schraube die Platte fest."},
+{de:"messen",lv:"mērīt",pron:"MEH-reet",ex:"Messe zuerst, dann schneide."},
+{de:"hobeln",lv:"ēvelēt",pron:"EH-ve-leat",ex:"Die Kante glatt hobeln."},
+{de:"schleifen",lv:"slīpēt",pron:"SLEE-peat",ex:"Das Holz vor dem Ölen schleifen."},
+{de:"leimen",lv:"līmēt",pron:"LEE-meat",ex:"Die Stücke zusammenleimen."},
+{de:"montieren",lv:"montēt",pron:"mon-TEAT",ex:"Den Rahmen montieren."},
+{de:"ausrichten",lv:"izlīdzināt",pron:"iz-LEED-zi-naat",ex:"Die Balken ausrichten."},
+{de:"abschneiden",lv:"nogriezt",pron:"NO-greest",ex:"Das Ende abschneiden."},
+]},
+trocken_material:{label:"Trockenbau – Material",labelLv:"Sausā būvniecība",icon:"🧱",color:"#2a1a3a",accent:"#9a5adb",words:[
+{de:"die Gipskartonplatte",lv:"ģipškartons",pron:"ghipsh-KAR-tons",ex:"GK-Platten für die Wand."},
+{de:"das Ständerprofil",lv:"statņu profils",pron:"STAT-nyu PRO-fils",ex:"Ständerprofile aufstellen."},
+{de:"das UW-Profil",lv:"UW profils",pron:"OO-VEH PRO-fils",ex:"UW unten und oben."},
+{de:"das CW-Profil",lv:"CW profils",pron:"TSEH-VEH PRO-fils",ex:"CW-Profile senkrecht einsetzen."},
+{de:"der Dübel",lv:"dībelis",pron:"DEE-be-liz",ex:"Dübel in die Wand schlagen."},
+{de:"die Schraube",lv:"skrūve",pron:"SKROO-ve",ex:"Die Schraube festziehen."},
+{de:"die Mineralwolle",lv:"minerālvate",pron:"mi-ne-RAAL-va-te",ex:"Mineralwolle als Dämmung."},
+{de:"die Spachtelmasse",lv:"špaktele",pron:"shpak-TE-le",ex:"Spachtel auftragen."},
+{de:"das Fugenband",lv:"šuvju lente",pron:"SHOOV-yu LEN-te",ex:"Fugenband kleben."},
+{de:"die Dampfbremse",lv:"tvaika barjera",pron:"TVAY-ka BAR-ye-ra",ex:"Dampfbremse hinter der GK."},
+{de:"der Estrich",lv:"cementa stāvs",pron:"tshe-MEN-ta STAAVZ",ex:"Estrich nivellieren."},
+{de:"der Klebeband",lv:"līmlente",pron:"LEEM-len-te",ex:"Klebeband zum Abdichten."},
+]},
+trocken_verb:{label:"Trockenbau – Verben",labelLv:"Sausā būvn. darbības",icon:"🔩",color:"#3a1a2a",accent:"#e05aaa",words:[
+{de:"spachteln",lv:"špaktelēt",pron:"shpak-te-LEAT",ex:"Die Fuge spachteln."},
+{de:"verschrauben",lv:"pieskrūvēt",pron:"pee-SKROO-veat",ex:"GK an Profil verschrauben."},
+{de:"dübeln",lv:"noenkurot",pron:"no-EN-ku-rot",ex:"Profil dübeln."},
+{de:"abkleben",lv:"nolīmēt",pron:"NO-lee-meat",ex:"Kanten abkleben."},
+{de:"verspachteln",lv:"aizspaktelēt",pron:"aiz-shpak-te-LEAT",ex:"Schraubenköpfe verspachteln."},
+{de:"abschleifen",lv:"noslīpēt",pron:"NO-slee-peat",ex:"Alles glatt abschleifen."},
+{de:"schneiden",lv:"griezt",pron:"GREEST",ex:"Die Platte genau schneiden."},
+{de:"ausbessern",lv:"labot",pron:"LA-bot",ex:"Schäden ausbessern."},
+]},
+elektro_material:{label:"Elektro – Material",labelLv:"Elektromateriāli",icon:"⚡",color:"#2a2a0a",accent:"#e8c43a",words:[
+{de:"das Kabel",lv:"kabelis",pron:"KA-be-liz",ex:"Das Kabel verlegen."},
+{de:"die Leitung",lv:"vads",pron:"VADZ",ex:"Die Leitung ist 3-adrig."},
+{de:"der Schalter",lv:"slēdzis",pron:"SLED-ziz",ex:"Schalter einbauen."},
+{de:"die Steckdose",lv:"kontaktligzda",pron:"kon-TAKT-lig-zda",ex:"Wo kommt die Steckdose hin?"},
+{de:"die Sicherung",lv:"drošinātājs",pron:"dro-shi-NAA-taayz",ex:"Sicherung ist rausgeflogen."},
+{de:"der Sicherungskasten",lv:"drošinātāju kaste",pron:"dro-shi-NAA-taa-yu KAS-te",ex:"Kabel zum Kasten führen."},
+{de:"die Abzweigdose",lv:"sazarojuma kārba",pron:"sa-za-RO-yu-ma KAAR-ba",ex:"Abzweigdose setzen."},
+{de:"der Erdleiter (PE)",lv:"zemējums (PE)",pron:"ze-MEH-yumz",ex:"PE ist grün-gelb."},
+{de:"der Neutralleiter (N)",lv:"nulvads (N)",pron:"NUL-vadz",ex:"N-Leiter ist blau."},
+{de:"der Phasenleiter (L)",lv:"fāzes vads (L)",pron:"FAA-zes vadz",ex:"L-Leiter ist braun."},
+{de:"das Installationsrohr",lv:"cauruļvads",pron:"kau-RULE-vadz",ex:"Kabel im Rohr führen."},
+{de:"der Bewegungsmelder",lv:"kustības sensors",pron:"KUS-tee-bas SEN-sorz",ex:"Bewegungsmelder außen."},
+{de:"der Dimmer",lv:"regulators",pron:"re-GOO-la-torz",ex:"Dimmer für das Wohnzimmer."},
+]},
+elektro_verb:{label:"Elektro – Verben",labelLv:"Elektro darbības",icon:"🔌",color:"#1a1a3a",accent:"#5a8aff",words:[
+{de:"anschließen",lv:"pieslēgt",pron:"pee-SLEYGT",ex:"Kabel anschließen."},
+{de:"verlegen",lv:"ieklāt",pron:"ee-KLAAT",ex:"Kabel verlegen."},
+{de:"abschalten",lv:"atslēgt",pron:"AT-sleygt",ex:"Strom abschalten!"},
+{de:"messen",lv:"mērīt",pron:"MEH-reet",ex:"Spannung messen."},
+{de:"prüfen",lv:"pārbaudīt",pron:"paar-BAU-deet",ex:"Anlage prüfen."},
+{de:"einbauen",lv:"iemontēt",pron:"ee-mon-TEAT",ex:"Schalter einbauen."},
+{de:"abisolieren",lv:"nolobīt",pron:"no-lo-BEET",ex:"Kabel abisolieren."},
+{de:"absichern",lv:"aizsargāt",pron:"aiz-SAR-gaat",ex:"Stromkreis absichern."},
+]},
+sicherheit:{label:"Sicherheit",labelLv:"Drošība",icon:"🦺",color:"#3a0a0a",accent:"#ff5a3a",words:[
+{de:"Achtung! Vorsicht!",lv:"Uzmanību!",pron:"ooz-MA-nee-boo",ex:"Achtung! Hochspannung!"},
+{de:"Gefahr!",lv:"Bīstami!",pron:"BEES-ta-mi",ex:"Gefahr! Nicht betreten!"},
+{de:"Strom abschalten!",lv:"Atslēgt strāvu!",pron:"AT-sleygt STRAA-voo",ex:"Strom abschalten!"},
+{de:"Erste Hilfe",lv:"Pirmā palīdzība",pron:"PIR-maa PA-leed-zee-ba",ex:"Erste-Hilfe-Kasten?"},
+{de:"Notruf 112",lv:"Ārkārtas palīdzība 112",pron:"AAR-kaar-tas PA-leed-zee-ba",ex:"Notruf: 112"},
+{de:"Verboten!",lv:"Aizliegts!",pron:"aiz-LEEGTS",ex:"Rauchen verboten!"},
+{de:"Schutzausrüstung",lv:"Aizsargaprīkojums",pron:"aiz-SARG-ap-ree-KO-yumz",ex:"Schutzausrüstung tragen."},
+{de:"Absperrung",lv:"Norobežojums",pron:"no-ro-be-ZHO-yumz",ex:"Absperrung aufstellen."},
+]},
+saetze:{label:"Nützliche Sätze",labelLv:"Noderīgas frāzes",icon:"💬",color:"#0a2a1a",accent:"#3acc8a",words:[
+{de:"Wo ist das?",lv:"Kur ir tas?",pron:"KUR ir tas",ex:"Wo ist der Hammer?"},
+{de:"Ich brauche Hilfe.",lv:"Man vajag palīdzību.",pron:"man VA-yag PA-leed-zee-boo",ex:""},
+{de:"Kannst du mir helfen?",lv:"Vai tu vari man palīdzēt?",pron:"vai tu VA-ri",ex:""},
+{de:"Wie viel Meter?",lv:"Cik metri?",pron:"TSIK ME-tri",ex:""},
+{de:"Ist es fertig?",lv:"Vai tas ir gatavs?",pron:"vai tas ir GA-tavs",ex:""},
+{de:"Vorsicht, Strom!",lv:"Uzmanību, strāva!",pron:"ooz-MA-nee-boo STRAA-va",ex:""},
+{de:"Der Strom ist abgeschaltet.",lv:"Strāva ir atslēgta.",pron:"STRAA-va ir AT-sleeg-ta",ex:""},
+{de:"Mach eine Pause.",lv:"Ej pauzē.",pron:"EY pau-ZEH",ex:""},
+{de:"Ich verstehe nicht.",lv:"Es nesaprotu.",pron:"es ne-SA-pro-tu",ex:""},
+{de:"Bitte sprich langsamer.",lv:"Lūdzu runā lēnāk.",pron:"LOOD-zu RU-naa LEEH-naak",ex:""},
+{de:"Bring mir das Werkzeug.",lv:"Atnes man darbarīkus.",pron:"AT-nes man DAR-ba-ree-kus",ex:""},
+]},
+};
+const ALL=Object.entries(VOCAB).flatMap(([cat,{words,icon}])=>words.map(w=>({...w,cat,icon})));
+const CATS=Object.keys(VOCAB);
+function useSpeech(){
+  const [ok,setOk]=useState(false);
+  const voiceRef=useRef(null);
+  useEffect(()=>{
+    if(!window.speechSynthesis)return;
+    setOk(true);
+    const load=()=>{
+      const vs=window.speechSynthesis.getVoices();
+      voiceRef.current=vs.find(v=>v.lang==="de-DE"&&v.localService)||vs.find(v=>v.lang==="de-DE")||vs.find(v=>v.lang.startsWith("de"))||null;
+    };
+    load();
+    window.speechSynthesis.onvoiceschanged=load;
+  },[]);
+  const speak=useCallback((text,rate=0.82)=>{
+    if(!window.speechSynthesis)return;
+    window.speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(text);
+    u.lang="de-DE";u.rate=rate;u.pitch=1;
+    if(voiceRef.current)u.voice=voiceRef.current;
+    window.speechSynthesis.speak(u);
+  },[]);
+  return{speak,ok};
+}
+function Spk({text,rate=0.82,label="🔈",speak,style={}}){
+  const [a,setA]=useState(false);
+  return <button onClick={e=>{e.stopPropagation();setA(true);speak(text,rate);setTimeout(()=>setA(false),1500);}}
+    className={a?"popping":""}
+    style={{background:a?"#1f6feb":"rgba(88,166,255,.12)",border:`1px solid ${a?"#58a6ff":"rgba(88,166,255,.3)"}`,
+    borderRadius:6,padding:"3px 9px",fontSize:13,color:a?"#fff":"#90c0ff",cursor:"pointer",...style}}>
+    {a?"🔊":label}
+  </button>;
+}
+function WordRow({w,learned,toggle,showCat,speak,ok}){
+  return <div className="row" style={{display:"grid",gridTemplateColumns:"1.2fr 1fr .9fr 1.4fr 70px 28px",
+    padding:"9px 13px",borderBottom:"1px solid #21262d",alignItems:"center",fontSize:13,gap:5,transition:"background .15s"}}>
+    <div style={{fontWeight:600,color:"#e6edf3",display:"flex",alignItems:"center",gap:5}}>
+      {showCat&&<span style={{fontSize:13}}>{w.icon}</span>}
+      <span>{w.de}</span>
+    </div>
+    <div style={{color:"#58a6ff",fontWeight:500}}>{w.lv}</div>
+    <div style={{color:"#8b949e",fontFamily:"monospace",fontSize:11}}>[{w.pron}]</div>
+    <div style={{color:"#586069",fontSize:11,fontStyle:"italic"}}>{w.ex||"—"}</div>
+    <div style={{display:"flex",gap:4}}>
+      {ok&&<Spk text={w.de} speak={speak} label="🔈"/>}
+      {ok&&w.ex&&<Spk text={w.ex} speak={speak} label="📝" style={{fontSize:11}}/>}
+    </div>
+    <div style={{textAlign:"center"}}>
+      <span onClick={()=>toggle(w.de)} style={{cursor:"pointer",fontSize:15,opacity:learned[w.de]?1:.25}}>
+        {learned[w.de]?"⭐":"☆"}
+      </span>
+    </div>
+  </div>;
+}
+function App(){
+  const {speak,ok}=useSpeech();
+  const [view,setView]=useState("home");
+  const [cat,setCat]=useState(null);
+  const [q,setQ]=useState("");
+  const [learned,setLearned]=useState({});
+  const [qWords,setQWords]=useState([]);
+  const [qIdx,setQIdx]=useState(0);
+  const [qScore,setQScore]=useState(0);
+  const [qAns,setQAns]=useState(null);
+  const [qChosen,setQChosen]=useState(null);
+  const [qDone,setQDone]=useState(false);
+  const [qSetup,setQSetup]=useState(true);
+  const [fIdx,setFIdx]=useState(0);
+  const [fFlip,setFFlip]=useState(false);
+  const [autoSpk,setAutoSpk]=useState(false);
+  const fWords=cat?VOCAB[cat].words:ALL;
+  function toggleLearned(de){setLearned(l=>l[de]?(({[de]:_,...r})=>r)(l):{...l,[de]:true});}
+  function startQuiz(k){
+    const pool=k?VOCAB[k].words:ALL;
+    const sh=[...pool].sort(()=>Math.random()-.5).slice(0,Math.min(12,pool.length));
+    setQWords(sh);setQIdx(0);setQScore(0);setQAns(null);setQChosen(null);setQDone(false);setQSetup(false);
+    setCat(k);setView("quiz");
+    setTimeout(()=>speak(sh[0]?.de),400);
+  }
+  function getOpts(word,pool){
+    const o=[...pool].filter(w=>w.de!==word.de).sort(()=>Math.random()-.5).slice(0,3);
+    return [...o,word].sort(()=>Math.random()-.5);
+  }
+  function handleAns(opt){
+    if(qAns)return;
+    setQAns(qWords[qIdx]);setQChosen(opt);
+    if(opt.de===qWords[qIdx].de)setQScore(s=>s+1);
+    setTimeout(()=>speak(qWords[qIdx].de),300);
+  }
+  function nextQ(){
+    const n=qIdx+1;
+    if(n>=qWords.length){setQDone(true);return;}
+    setQIdx(n);setQAns(null);setQChosen(null);
+  }
+  useEffect(()=>{if(fFlip&&autoSpk&&ok)speak(fWords[fIdx]?.de);},[fFlip]);
+  const searchRes=q.length>1?ALL.filter(w=>w.de.toLowerCase().includes(q.toLowerCase())||w.lv.toLowerCase().includes(q.toLowerCase())):[];
+  const total=ALL.length;
+  const lcount=Object.keys(learned).length;
+  return <div style={{minHeight:"100vh",background:"linear-gradient(160deg,#0d1117 0%,#161b22 60%,#0d1117 100%)"}}>
+  <nav style={{background:"rgba(13,17,23,.97)",backdropFilter:"blur(12px)",borderBottom:"1px solid #21262d",
+    padding:"10px 14px",display:"flex",alignItems:"center",gap:10,position:"sticky",top:0,zIndex:200,flexWrap:"wrap"}}>
+    <span style={{fontSize:20,cursor:"pointer"}} onClick={()=>setView("home")}>🏗️</span>
+    <span style={{fontWeight:700,fontSize:14,color:"#58a6ff",cursor:"pointer"}} onClick={()=>setView("home")}>BAU-WÖRTERBUCH</span>
+    {ok&&<span style={{fontSize:11,color:"#3fb950",background:"#0d2010",borderRadius:4,padding:"2px 7px"}}>🔊 Audio aktiv</span>}
+    <div style={{flex:1}}/>
+    {[["home","🏠 Home"],["browse","📖 Wörter"],["quiz","🎯 Quiz"],["flashcard","🃏 Karten"]].map(([k,label])=>
+      <button key={k} onClick={()=>{setView(k);if(k==="quiz")setQSetup(true);}}
+        style={{background:view===k?"#1f6feb":"transparent",border:view===k?"none":"1px solid #30363d",
+        color:view===k?"#fff":"#8b949e",borderRadius:6,padding:"5px 11px",fontSize:12,fontWeight:600}}>
+        {label}
+      </button>
+    )}
+  </nav>
+  <div style={{maxWidth:900,margin:"0 auto",padding:"18px 12px"}}>
+  {view==="home"&&<div className="fadein">
+    <div style={{background:"linear-gradient(135deg,#1a2d45,#0d1724)",border:"1px solid #1f3a5a",borderRadius:14,padding:"28px 22px",marginBottom:16,position:"relative",overflow:"hidden"}}>
+      <div style={{position:"absolute",right:-5,top:-5,fontSize:110,opacity:.06,userSelect:"none"}}>🏗️</div>
+      <div style={{fontSize:26,fontWeight:700,marginBottom:4}}>Baustellenwörterbuch</div>
+      <div style={{fontSize:16,color:"#58a6ff",fontWeight:500,marginBottom:4}}>Celtniecības Vārdnīca</div>
+      <div style={{color:"#8b949e",fontSize:13,marginBottom:16}}>Latviešu → Deutsch · Holzbau · Trockenbau · Elektro</div>
+      {ok&&<div style={{background:"rgba(63,185,80,.08)",border:"1px solid rgba(63,185,80,.2)",borderRadius:8,padding:"7px 12px",marginBottom:16,fontSize:12,color:"#3fb950",display:"inline-block"}}>
+        🔊 Tippe auf 🔈 um jedes Wort auf Deutsch zu hören
+      </div>}
+      <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+        {[["Wörter",total,"#58a6ff"],["Kategorien",CATS.length,"#3fb950"],["Gelernt",lcount,"#e3b341"],["Fortschritt",total?Math.round(lcount/total*100)+"%":"0%","#bc8cff"]].map(([l,v,c])=>
+          <div key={l} style={{background:"#0d1117",border:`1px solid ${c}44`,borderRadius:8,padding:"8px 14px",minWidth:80}}>
+            <div style={{fontSize:20,fontWeight:700,color:c}}>{v}</div>
+            <div style={{fontSize:11,color:"#8b949e"}}>{l}</div>
+          </div>
+        )}
+      </div>
+    </div>
+    <div style={{background:"#161b22",border:"1px solid #30363d",borderRadius:10,padding:"9px 13px",marginBottom:16,display:"flex",alignItems:"center",gap:9}}>
+      <span>🔍</span>
+      <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Auf Deutsch oder Latviešu suchen…" style={{flex:1,fontSize:14}}/>
+      {q&&<span onClick={()=>setQ("")} style={{cursor:"pointer",color:"#8b949e"}}>✕</span>}
+    </div>
+    {q.length>1&&<div style={{background:"#161b22",border:"1px solid #30363d",borderRadius:10,marginBottom:16,overflow:"hidden"}}>
+      {searchRes.length===0
+        ?<div style={{padding:20,textAlign:"center",color:"#586069"}}>Keine Ergebnisse.</div>
+        :searchRes.slice(0,8).map((w,i)=><WordRow key={i} w={w} learned={learned} toggle={toggleLearned} showCat speak={speak} ok={ok}/>)}
+    </div>}
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:10}}>
+      {CATS.map(k=>{
+        const c=VOCAB[k];
+        const done=c.words.filter(w=>learned[w.de]).length;
+        return <div key={k} className="tile" style={{background:`linear-gradient(135deg,${c.color}cc,${c.color}55)`,border:`1px solid ${c.accent}33`,borderRadius:12,padding:14}}>
+          <div style={{fontSize:24,marginBottom:5}}>{c.icon}</div>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:2}}>{c.label}</div>
+          <div style={{fontSize:11,color:c.accent,marginBottom:7}}>{c.labelLv}</div>
+          <div style={{fontSize:11,color:"#8b949e",marginBottom:9}}>{c.words.length} Wörter · {done} gelernt</div>
+          <div style={{display:"flex",gap:5,marginBottom:8}}>
+            {[["📖","browse"],["🎯","quiz"],["🃏","flashcard"]].map(([ic,vv])=>
+              <button key={vv} onClick={()=>{setCat(k);if(vv==="quiz")startQuiz(k);else{setFIdx(0);setFFlip(false);setView(vv);}}}
+                style={{flex:1,background:`${c.accent}22`,border:`1px solid ${c.accent}44`,color:c.accent,borderRadius:6,padding:"4px 0",fontSize:14,fontWeight:700}}>{ic}</button>
+            )}
+          </div>
+          <div style={{height:3,background:"#ffffff11",borderRadius:99,overflow:"hidden"}}>
+            <div style={{height:"100%",width:`${c.words.length?done/c.words.length*100:0}%`,background:c.accent,transition:"width .5s"}}/>
+          </div>
+        </div>;
+      })}
+    </div>
+  </div>}
+  {view==="browse"&&<div className="fadein">
+    <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:12,flexWrap:"wrap"}}>
+      <button onClick={()=>setView("home")} style={{background:"#21262d",border:"none",color:"#8b949e",borderRadius:6,padding:"5px 11px",fontSize:12}}>← Zurück</button>
+      <select value={cat||""} onChange={e=>setCat(e.target.value||null)}>
+        <option value="">Alle Kategorien</option>
+        {CATS.map(k=><option key={k} value={k}>{VOCAB[k].icon} {VOCAB[k].label}</option>)}
+      </select>
+      <input value={q} onChange={e=>setQ(e.target.value)} placeholder="🔍 Filtern…"
+        style={{background:"#161b22",border:"1px solid #30363d",borderRadius:6,padding:"5px 10px",fontSize:13,width:160,color:"#e6edf3"}}/>
+    </div>
+    <div style={{background:"#161b22",border:"1px solid #30363d",borderRadius:10,overflow:"hidden"}}>
+      <div style={{display:"grid",gridTemplateColumns:"1.2fr 1fr .9fr 1.4fr 70px 28px",padding:"8px 13px",borderBottom:"1px solid #21262d",fontSize:10,fontWeight:700,color:"#58a6ff",textTransform:"uppercase",letterSpacing:1,gap:5}}>
+        <div>🇩🇪 Deutsch</div><div>🇱🇻 Latviešu</div><div>Aussprache</div><div>Beispiel</div><div>Audio</div><div></div>
+      </div>
+      {(cat?VOCAB[cat].words:ALL).filter(w=>!q||w.de.toLowerCase().includes(q.toLowerCase())||w.lv.toLowerCase().includes(q.toLowerCase()))
+        .map((w,i)=><WordRow key={i} w={w} learned={learned} toggle={toggleLearned} showCat={!cat} speak={speak} ok={ok}/>)}
+    </div>
+  </div>}
+  {view==="quiz"&&<div className="fadein">
+    {qSetup&&<div>
+      <div style={{fontSize:20,fontWeight:700,color:"#58a6ff",marginBottom:14}}>🎯 Quiz — Latviešu → Deutsch</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(175px,1fr))",gap:9}}>
+        {[{k:null,label:"Alle Kategorien",icon:"🏗️",count:ALL.length,accent:"#58a6ff"},
+          ...CATS.map(k=>({k,label:VOCAB[k].label,icon:VOCAB[k].icon,count:VOCAB[k].words.length,accent:VOCAB[k].accent}))
+        ].map(({k,label,icon,count,accent})=>
+          <div key={k||"all"} className="tile" onClick={()=>startQuiz(k)}
+            style={{background:"#161b22",border:`1px solid ${accent}44`,borderRadius:10,padding:13}}>
+            <div style={{fontSize:22,marginBottom:4}}>{icon}</div>
+            <div style={{fontWeight:700,fontSize:13,marginBottom:3}}>{label}</div>
+            <div style={{fontSize:11,color:"#8b949e"}}>bis zu {Math.min(count,12)} Fragen</div>
+          </div>
+        )}
+      </div>
+    </div>}
+    {!qSetup&&!qDone&&qWords.length>0&&(()=>{
+      const word=qWords[qIdx];
+      const opts=getOpts(word,qWords);
+      return <div>
+        <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:16}}>
+          <button onClick={()=>setQSetup(true)} style={{background:"#21262d",border:"none",color:"#8b949e",borderRadius:6,padding:"5px 10px",fontSize:12}}>✕</button>
+          <div style={{flex:1,background:"#21262d",borderRadius:99,height:6,overflow:"hidden"}}>
+            <div style={{height:"100%",width:`${qIdx/qWords.length*100}%`,background:"#58a6ff",transition:"width .4s"}}/>
+          </div>
+          <span style={{fontSize:13,color:"#8b949e"}}>{qIdx+1}/{qWords.length}</span>
+          <span style={{fontSize:13,color:"#3fb950",fontWeight:700}}>✓{qScore}</span>
+        </div>
+        <div style={{background:"#1c2128",border:"1px solid #30363d",borderRadius:13,padding:"24px 20px",marginBottom:14,textAlign:"center"}}>
+          <div style={{fontSize:11,color:"#8b949e",letterSpacing:2,textTransform:"uppercase",marginBottom:10}}>🇱🇻 Was bedeutet auf Deutsch:</div>
+          <div style={{fontSize:28,fontWeight:700,marginBottom:12}}>{word.lv}</div>
+          {qAns&&<div>
+            {word.ex&&<div style={{fontSize:12,color:"#8b949e",fontStyle:"italic",marginBottom:10}}>„{word.ex}"</div>}
+            {ok&&<div style={{display:"flex",gap:9,justifyContent:"center",flexWrap:"wrap"}}>
+              <Spk text={word.de} speak={speak} label="🔊 Wort hören"/>
+              {word.ex&&<Spk text={word.ex} speak={speak} label="📝 Satz hören"/>}
+            </div>}
+          </div>}
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9,marginBottom:13}}>
+          {opts.map((opt,i)=>{
+            const right=qAns&&opt.de===qAns.de;
+            const wrong=qAns&&qChosen?.de===opt.de&&!right;
+            return <div key={i} className="opt" onClick={()=>handleAns(opt)}
+              style={{background:right?"#122a1a":wrong?"#2a1212":"#1c2128",
+              border:`2px solid ${right?"#3fb950":wrong?"#f85149":"#30363d"}`,
+              borderRadius:10,padding:"12px 14px",
+              color:right?"#3fb950":wrong?"#f85149":"#e6edf3",fontWeight:600,fontSize:14,
+              display:"flex",alignItems:"center",gap:8,cursor:qAns?"default":"pointer"}}>
+              <span style={{fontSize:17,minWidth:18}}>{right?"✓":wrong?"✗":["A","B","C","D"][i]}</span>
+              <span>{opt.de}</span>
+            </div>;
+          })}
+        </div>
+        {qAns&&<button onClick={nextQ} style={{width:"100%",background:"#1f6feb",border:"none",color:"#fff",borderRadius:10,padding:13,fontSize:14,fontWeight:700}}>
+          {qIdx+1<qWords.length?"Weiter →":"Ergebnis anzeigen"}
+        </button>}
+      </div>;
+    })()}
+    {qDone&&<div style={{textAlign:"center",padding:"36px 20px"}} className="fadein">
+      <div style={{fontSize:60,marginBottom:12}}>{qScore>=qWords.length*.8?"🏆":qScore>=qWords.length*.5?"👍":"📚"}</div>
+      <div style={{fontSize:26,fontWeight:700,marginBottom:6}}>{qScore} / {qWords.length}</div>
+      <div style={{color:"#8b949e",marginBottom:20}}>{qScore>=qWords.length*.8?"Ausgezeichnet! Labi padarīts!":qScore>=qWords.length*.5?"Gut gemacht! Labi!":"Übe weiter! Trenējies tālāk!"}</div>
+      <div style={{display:"flex",gap:10,justifyContent:"center"}}>
+        <button onClick={()=>startQuiz(cat)} style={{background:"#1f6feb",border:"none",color:"#fff",borderRadius:8,padding:"10px 20px",fontWeight:700}}>🔄 Nochmal</button>
+        <button onClick={()=>setQSetup(true)} style={{background:"#21262d",border:"none",color:"#e6edf3",borderRadius:8,padding:"10px 20px"}}>Neue Kategorie</button>
+      </div>
+    </div>}
+  </div>}
+  {view==="flashcard"&&<div className="fadein">
+    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12,flexWrap:"wrap"}}>
+      <button onClick={()=>setView("home")} style={{background:"#21262d",border:"none",color:"#8b949e",borderRadius:6,padding:"5px 10px",fontSize:12}}>← Zurück</button>
+      <select value={cat||""} onChange={e=>{setCat(e.target.value||null);setFIdx(0);setFFlip(false);}}>
+        <option value="">Alle</option>
+        {CATS.map(k=><option key={k} value={k}>{VOCAB[k].icon} {VOCAB[k].label}</option>)}
+      </select>
+      {ok&&<button onClick={()=>setAutoSpk(a=>!a)} style={{background:autoSpk?"#1a3a1a":"#1c2128",border:`1px solid ${autoSpk?"#3fb950":"#30363d"}`,color:autoSpk?"#3fb950":"#8b949e",borderRadius:6,padding:"5px 10px",fontSize:12,fontWeight:600}}>
+        {autoSpk?"🔊 Auto AN":"🔇 Auto AUS"}
+      </button>}
+      <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:6}}>
+        <span style={{fontSize:13,color:"#8b949e"}}>{fIdx+1}/{fWords.length}</span>
+        <button onClick={()=>{setFIdx(i=>Math.max(0,i-1));setFFlip(false);}} style={{background:"#21262d",border:"none",color:"#e6edf3",borderRadius:6,padding:"5px 12px",fontSize:15}}>‹</button>
+        <button onClick={()=>{setFIdx(i=>Math.min(fWords.length-1,i+1));setFFlip(false);}} style={{background:"#21262d",border:"none",color:"#e6edf3",borderRadius:6,padding:"5px 12px",fontSize:15}}>›</button>
+      </div>
+    </div>
+    <div style={{background:"#21262d",borderRadius:99,height:4,marginBottom:14,overflow:"hidden"}}>
+      <div style={{height:"100%",width:`${(fIdx+1)/fWords.length*100}%`,background:"#58a6ff",transition:"width .3s"}}/>
+    </div>
+    <div style={{perspective:"1000px",marginBottom:13}}>
+      <div className={`flip-wrap${fFlip?" on":""}`} onClick={()=>{setFFlip(f=>!f);if(!fFlip&&ok)setTimeout(()=>speak(fWords[fIdx]?.de),360);}}
+        style={{position:"relative",height:290,cursor:"pointer"}}>
+        <div className="face" style={{background:"linear-gradient(135deg,#1c2128,#161b22)",border:"1px solid #30363d",
+          display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:28}}>
+          <div style={{fontSize:10,color:"#58a6ff",letterSpacing:3,textTransform:"uppercase",marginBottom:14}}>🇱🇻 Latviešu — Was heißt das auf Deutsch?</div>
+          <div style={{fontSize:32,fontWeight:700,textAlign:"center",marginBottom:8}}>{fWords[fIdx]?.lv}</div>
+          <div style={{fontSize:12,color:"#586069",marginTop:18}}>👆 Antippen zum Aufdecken</div>
+        </div>
+        <div className="face back" style={{background:"linear-gradient(135deg,#0f2215,#0a160d)",border:"1px solid #3fb95033",
+          display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24}}>
+          <div style={{fontSize:10,color:"#3fb950",letterSpacing:3,textTransform:"uppercase",marginBottom:10}}>🇩 Deutsch — Antwort</div>
+          <div style={{fontSize:30,fontWeight:700,textAlign:"center",marginBottom:7}}>{fWords[fIdx]?.de}</div>
+          <div style={{background:"rgba(88,166,255,.1)",border:"1px solid rgba(88,166,255,.2)",borderRadius:7,padding:"5px 14px",marginBottom:12,fontSize:14,color:"#58a6ff",fontFamily:"monospace"}}>
+            [{fWords[fIdx]?.pron}]
+          </div>
+          {ok&&<div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap",justifyContent:"center"}}>
+            <Spk text={fWords[fIdx]?.de} speak={speak} rate={0.82} label="🔊 Normal"/>
+            <Spk text={fWords[fIdx]?.de} speak={speak} rate={0.55} label="🐢 Langsam"/>
+            {fWords[fIdx]?.ex&&<Spk text={fWords[fIdx].ex} speak={speak} rate={0.78} label="📝 Satz"/>}
+          </div>}
+          {fWords[fIdx]?.ex&&<div style={{fontSize:12,color:"#8b949e",textAlign:"center",fontStyle:"italic"}}>„{fWords[fIdx].ex}"</div>}
+        </div>
+      </div>
+    </div>
+    <div style={{display:"flex",gap:9,marginBottom:11}}>
+      <button onClick={()=>{const w=fWords[fIdx];setLearned(l=>{const n={...l};delete n[w.de];return n;});setFIdx(i=>Math.min(fWords.length-1,i+1));setFFlip(false);}}
+        style={{flex:1,background:"#2a1212",border:"1px solid #f8514933",color:"#f85149",borderRadius:10,padding:12,fontWeight:700,fontSize:14}}>✗ Noch nicht</button>
+      <button onClick={()=>{const w=fWords[fIdx];setLearned(l=>({...l,[w.de]:true}));setFIdx(i=>Math.min(fWords.length-1,i+1));setFFlip(false);}}
+        style={{flex:1,background:"#122a12",border:"1px solid #3fb95033",color:"#3fb950",borderRadius:10,padding:12,fontWeight:700,fontSize:14}}>✓ Gelernt!</button>
+    </div>
+    <div style={{display:"flex",gap:3,flexWrap:"wrap"}}>
+      {fWords.map((w,i)=><div key={i} onClick={()=>{setFIdx(i);setFFlip(false);}}
+        style={{width:11,height:11,borderRadius:3,cursor:"pointer",transition:"background .2s",
+        background:learned[w.de]?"#3fb950":i===fIdx?"#58a6ff":"#21262d"}}/>)}
+    </div>
+  </div>}
+  </div></div>;
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
